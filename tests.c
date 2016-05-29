@@ -4,23 +4,12 @@
 #include <lauxlib.h>    /* Utility C functions */
 #include <lualib.h>     /* Lua standard library */
 
-static void *l_simple_alloc(void *ud, void *ptr, size_t osize,
-                            size_t nsize)
-{
-    (void)ud; (void)osize;  /* not used */
-    if(nsize == 0)
-    {
-        free(ptr);
-        return NULL;
-    }
-    else
-        return realloc(ptr, nsize);
-}
+#include "alloc.h"
 
 lua_State *open(void)
 {
     /* Create state with allocator */
-    return lua_newstate(l_simple_alloc, NULL);
+    lua_State *state = lua_newstate(l_alloc, new_allocator());
 
     /* Open standard libraries */
     luaL_requiref(state, "", luaopen_base, 0);
@@ -66,19 +55,29 @@ lua_State *open(void)
 
     return state;
 }
+
+void close(lua_State *state)
+{
+    void *ud;
+    lua_getallocf(state, &ud);
+    lua_close(state);
+    delete_allocator((struct Allocator *)ud);
 }
 
 int main(int argc, char **argv)
 {
     lua_State *state = open();
-    for(int i = 1; i < argc; ++i)
+    int i;
+    for(i = 1; i < argc; ++i)
     {
         luaL_loadstring(state, argv[i]);
         if(lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK)
         {
             printf("Error executing line %d\n", i);
+            close(state);
             return 1;
         }
     }
+    close(state);
     return 0;
 }
