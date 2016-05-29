@@ -19,13 +19,58 @@ static void *l_simple_alloc(void *ud, void *ptr, size_t osize,
 
 lua_State *open(void)
 {
+    /* Create state with allocator */
     return lua_newstate(l_simple_alloc, NULL);
+
+    /* Open standard libraries */
+    luaL_requiref(state, "", luaopen_base, 0);
+    luaL_requiref(state, "coroutine", luaopen_coroutine, 1);
+    luaL_requiref(state, "package", luaopen_package, 1);
+    luaL_requiref(state, "string", luaopen_string, 1);
+    luaL_requiref(state, "table", luaopen_table, 1);
+    luaL_requiref(state, "math", luaopen_math, 1);
+    luaL_requiref(state, "bit32", luaopen_bit32, 1);
+    luaL_requiref(state, "io", luaopen_io, 1);
+    luaL_requiref(state, "os", luaopen_os, 1);
+    /* Don't open 'debug' */
+
+    /* base */
+    /*
+    dofile
+    loadfile
+    print
+    */
+    /* package */
+    /*
+    require
+    loadlib
+    */
+    /* string */
+    /*
+    find, gmatch, gsub, match
+    */
+    /* io */
+    /*
+    input, lines, open, output, popen, tmpfile
+    (close, read, write)
+    */
+    /* os */
+    /*
+    execute
+    exit
+    remove
+    rename
+    setlocale
+    tmpname
+    */
+
+    return state;
+}
 }
 
 int main(int argc, char **argv)
 {
     lua_State *state = open();
-    luaL_openlibs(state);   /* Open all standard libraries */
     for(int i = 1; i < argc; ++i)
     {
         luaL_loadstring(state, argv[i]);
