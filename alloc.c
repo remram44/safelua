@@ -41,6 +41,8 @@ void *l_alloc(void *ud, void *ptr, size_t osize, size_t nsize)
     size_t blk;
     if(ptr == NULL)
     {
+        if(nsize == 0)
+            return NULL;
         blk = alloc->nb_blocks;
         alloc->nb_blocks++;
         if(alloc->nb_blocks > alloc->size_blocks)
