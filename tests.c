@@ -22,15 +22,18 @@ lua_State *open(void)
     return lua_newstate(l_simple_alloc, NULL);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     lua_State *state = open();
-    luaL_loadstring(state, "print(\"Hello world!\")");
     luaL_openlibs(state);   /* Open all standard libraries */
-    if(lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK)
+    for(int i = 1; i < argc; ++i)
     {
-        printf("Error executing code\n");
-        return 1;
+        luaL_loadstring(state, argv[i]);
+        if(lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK)
+        {
+            printf("Error executing line %d\n", i);
+            return 1;
+        }
     }
     return 0;
 }
