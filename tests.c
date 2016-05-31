@@ -1,83 +1,40 @@
 #include <stdio.h>
-#include <stdlib.h>
 #include <lua.h>        /* Core Lua */
 #include <lauxlib.h>    /* Utility C functions */
-#include <lualib.h>     /* Lua standard library */
 
-#include "alloc.h"
+#include "safelua.h"
 
-lua_State *open(void)
+int mycancel(lua_State *_state, void *ud)
 {
-    /* Create state with allocator */
-    lua_State *state = lua_newstate(l_alloc, new_allocator());
-
-    /* Open standard libraries */
-    luaL_requiref(state, "", luaopen_base, 0);
-    luaL_requiref(state, "coroutine", luaopen_coroutine, 1);
-    luaL_requiref(state, "package", luaopen_package, 1);
-    luaL_requiref(state, "string", luaopen_string, 1);
-    luaL_requiref(state, "table", luaopen_table, 1);
-    luaL_requiref(state, "math", luaopen_math, 1);
-    luaL_requiref(state, "bit32", luaopen_bit32, 1);
-    luaL_requiref(state, "io", luaopen_io, 1);
-    luaL_requiref(state, "os", luaopen_os, 1);
-    /* Don't open 'debug' */
-
-    /* base */
-    /*
-    dofile
-    loadfile
-    print
-    */
-    /* package */
-    /*
-    require
-    loadlib
-    */
-    /* string */
-    /*
-    find, gmatch, gsub, match
-    */
-    /* io */
-    /*
-    input, lines, open, output, popen, tmpfile
-    (close, read, write)
-    */
-    /* os */
-    /*
-    execute
-    exit
-    remove
-    rename
-    setlocale
-    tmpname
-    */
-
-    return state;
-}
-
-void close(lua_State *state)
-{
-    void *ud;
-    lua_getallocf(state, &ud);
-    lua_close(state);
-    delete_allocator((struct Allocator *)ud);
+    int *counter = ud;
+    fprintf(stderr, "Hook: %d\n", *counter);
+    return --(*counter) <= 0;
 }
 
 int main(int argc, char **argv)
 {
-    lua_State *state = open();
+    lua_State *state = safelua_open();
     int i;
     for(i = 1; i < argc; ++i)
     {
         luaL_loadstring(state, argv[i]);
-        if(lua_pcall(state, 0, LUA_MULTRET, 0) != LUA_OK)
+        int counter = 3;
+        int ret = safelua_pcallk(state, 0, LUA_MULTRET, 0, 0, NULL,
+                                 mycancel, &counter);
+        if(ret == LUA_OK)
+            ;
+        else if(ret == SAFELUA_CANCELED)
         {
-            printf("Error executing line %d\n", i);
-            close(state);
+            printf("Canceled during line %d\n", i);
+            return 2;
+        }
+        else
+        {
+            printf("Error executing line %d: %d\n", i, ret);
+            safelua_close(state);
             return 1;
         }
     }
-    close(state);
+    safelua_close(state);
     return 0;
 }
