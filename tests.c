@@ -74,6 +74,7 @@ int main(int argc, char **argv)
         else if(ret == SAFELUA_CANCELED)
         {
             printf("Canceled during line %d\n", i);
+            fprintf(stderr, "Resources: \"%s\"\n", resources);
             return 2;
         }
         else
