@@ -107,29 +107,35 @@ int safelua_pcallk(lua_State *state, int nargs, int nresults,
     jmp_buf env;
     int ret;
 
-    /* Set hook from which we will be able to exit */
-    lua_sethook(state, cancel_hook, LUA_MASKCOUNT, 10);
-
-    if(setjmp(env) == 0)
-    {
-        setudregistry(state, &env, REG_CANCELJMP);
-        setudregistry(state, cancel, REG_CANCEL);
-        setudregistry(state, canceludata, REG_CANCELUDATA);
-        ret = lua_pcallk(state, nargs, nresults, errfunc, ctx, k);
-        lua_pushnil(state);
-        lua_setfield(state, LUA_REGISTRYINDEX, REG_CANCEL);
-        lua_pushnil(state);
-        lua_setfield(state, LUA_REGISTRYINDEX, REG_CANCELJMP);
-        lua_sethook(state, cancel_hook, 0, 0);
-    }
+    /* If catch point is already set, do a normal pcallk */
+    if(getudregistry(state, REG_CANCELJMP) != NULL)
+        return lua_pcallk(state, nargs, nresults, errfunc, ctx, k);
     else
     {
-        delete_allocator(policy->allocator);
-        free(policy);
-        ret = SAFELUA_CANCELED;
-    }
+        /* Set hook from which we will be able to exit */
+        lua_sethook(state, cancel_hook, LUA_MASKCOUNT, 10);
 
-    return ret;
+        if(setjmp(env) == 0)
+        {
+            setudregistry(state, &env, REG_CANCELJMP);
+            setudregistry(state, cancel, REG_CANCEL);
+            setudregistry(state, canceludata, REG_CANCELUDATA);
+            ret = lua_pcallk(state, nargs, nresults, errfunc, ctx, k);
+            lua_pushnil(state);
+            lua_setfield(state, LUA_REGISTRYINDEX, REG_CANCEL);
+            lua_pushnil(state);
+            lua_setfield(state, LUA_REGISTRYINDEX, REG_CANCELJMP);
+            lua_sethook(state, cancel_hook, 0, 0);
+        }
+        else
+        {
+            delete_allocator(policy->allocator);
+            free(policy);
+            ret = SAFELUA_CANCELED;
+        }
+
+        return ret;
+    }
 }
 
 void safelua_checkcancel(lua_State *state)
