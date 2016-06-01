@@ -14,8 +14,7 @@ struct Block {
 
 struct Allocator {
     struct Block *blocks;
-    size_t nb_blocks;
-    size_t size_blocks;
+    size_t nb_blocks, size_blocks;
     size_t total_allocated;
 };
 

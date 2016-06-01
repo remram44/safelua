@@ -27,14 +27,23 @@ static void *getudregistry(lua_State *state, const char *name)
     return ret;
 }
 
+struct Handler {
+    safelua_Handler callback;
+    void *udata;
+};
+
 struct Policy {
     struct Allocator *allocator;
+    struct Handler *handlers;
+    size_t nb_handlers, size_handlers;
 };
 
 lua_State *safelua_open(void)
 {
     struct Policy *policy = malloc(sizeof(struct Policy));
     policy->allocator = new_allocator();
+    policy->handlers = NULL;
+    policy->nb_handlers = policy->size_handlers = 0;
 
     /* Create state with allocator */
     lua_State *state = lua_newstate(l_alloc, policy->allocator);
@@ -86,10 +95,19 @@ lua_State *safelua_open(void)
     return state;
 }
 
+static void free_resources(struct Policy *policy, int why)
+{
+    size_t i;
+    for(i = 0; i < policy->nb_handlers; ++i)
+        policy->handlers[i].callback(why, policy->handlers[i].udata);
+    free(policy->handlers);
+}
+
 void safelua_close(lua_State *state)
 {
     struct Policy *policy = getudregistry(state, REG_POLICY);
     lua_close(state);
+    free_resources(policy, SAFELUA_FINISHED);
     delete_allocator(policy->allocator);
     free(policy);
 }
@@ -129,6 +147,7 @@ int safelua_pcallk(lua_State *state, int nargs, int nresults,
         }
         else
         {
+            free_resources(policy, SAFELUA_CANCELED);
             delete_allocator(policy->allocator);
             free(policy);
             ret = SAFELUA_CANCELED;
@@ -157,4 +176,43 @@ int safelua_shouldcancel(lua_State *state)
     void *canceludata = getudregistry(state, REG_CANCELUDATA);
 
     return cancel && cancel(state, canceludata);
+}
+
+void safelua_add_handler(lua_State *state, safelua_Handler handler,
+                         void *handlerudata)
+{
+    struct Policy *policy = getudregistry(state, REG_POLICY);
+    if(++policy->nb_handlers > policy->size_handlers)
+    {
+        if(policy->size_handlers == 0)
+            policy->size_handlers = 4;
+        else
+            policy->size_handlers *= 2;
+        policy->handlers = realloc(
+            policy->handlers,
+            sizeof(struct Handler) * policy->size_handlers);
+    }
+    {
+        struct Handler *h = &policy->handlers[policy->nb_handlers - 1];
+        h->callback = handler;
+        h->udata = handlerudata;
+    }
+}
+
+int safelua_remove_handler(lua_State *state, safelua_Handler handler,
+                           void *handlerudata)
+{
+    struct Policy *policy = getudregistry(state, REG_POLICY);
+    size_t found = 0;
+    size_t pos = 0;
+    for(; pos < policy->nb_handlers; ++pos)
+    {
+        if(policy->handlers[pos].callback == handler &&
+                policy->handlers[pos].udata == handlerudata)
+            found++;
+        else
+            policy->handlers[pos - found] = policy->handlers[pos];
+    }
+    policy->nb_handlers -= found;
+    return found;
 }
