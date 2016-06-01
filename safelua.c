@@ -94,18 +94,6 @@ void safelua_close(lua_State *state)
     free(policy);
 }
 
-void safelua_checkcancel(lua_State *state)
-{
-    safelua_CancelCheck cancel = getudregistry(state, REG_CANCEL);
-    void *canceludata = getudregistry(state, REG_CANCELUDATA);
-
-    if(cancel(state, canceludata))
-    {
-        jmp_buf *env = getudregistry(state, REG_CANCELJMP);
-        longjmp(*env, 1);
-    }
-}
-
 static void cancel_hook(lua_State *state, lua_Debug *ar)
 {
     safelua_checkcancel(state);
@@ -142,4 +130,20 @@ int safelua_pcallk(lua_State *state, int nargs, int nresults,
     }
 
     return ret;
+}
+
+void safelua_checkcancel(lua_State *state)
+{
+    safelua_CancelCheck cancel = getudregistry(state, REG_CANCEL);
+    void *canceludata = getudregistry(state, REG_CANCELUDATA);
+
+    if(cancel && cancel(state, canceludata))
+        safelua_cancel(state);
+}
+
+void safelua_cancel(lua_State *state)
+{
+    jmp_buf *env = getudregistry(state, REG_CANCELJMP);
+    if(env)
+        longjmp(*env, 1);
 }
