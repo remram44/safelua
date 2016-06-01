@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/remram44/safelua.svg?branch=master)]
+(https://travis-ci.org/remram44/safelua)
+
 safelua
 =======
 
