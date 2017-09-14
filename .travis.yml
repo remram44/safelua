@@ -6,8 +6,7 @@ addons:
       - cmake
       - liblua5.2-dev
       - valgrind
-install:
-  - cmake -DCMAKE_BUILD_TYPE=Debug .
-  - make
-script:
-  - ./tests.sh
+install: |
+  cmake -DCMAKE_BUILD_TYPE=Debug . && \
+  make
+script: ./tests.sh
